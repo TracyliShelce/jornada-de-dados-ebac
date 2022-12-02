@@ -1,5 +1,247 @@
 Comandos  utilizados:
 
 
-//--Visualizar tabela Vendas com SQL
+--Visualizar tabela Vendas com SQL
 select * from tbvendas
+--------------------------------------------------------------
+
+--Visualizar tabela Potencial com SQL
+select * from tbpotencial
+
+--------------------------------------------------------------
+
+%python
+    
+#Listar diretórios no DBFS 
+    
+dbutils.fs.ls("/FileStore/tables/ebac")
+
+--------------------------------------------------------------
+
+%python
+ 
+#Criar DataFrame da tabela de vendas 
+ 
+df_vendas = (spark.read
+  .format("csv")
+  .option("header", "true")
+  .option("inferSchema", "true")
+  .load("/FileStore/tables/ebac/Vendas.csv")
+)
+ 
+display(df_vendas)
+--------------------------------------------------------------
+
+%python
+ 
+#Criar DataFrame da tabela de potencial 
+    
+df_potencial = (spark.read
+  .format("csv")
+  .option("header", "true") #Primeira linha cabeçalho
+  .option("inferSchema", "true") #Define o tipo de dados automaticamente para cada coluna
+  .load("/FileStore/tables/ebac/Vendas_Potencial.csv")
+)
+ 
+display(df_potencial)
+-------------------------------------------------------------
+
+%python
+ 
+ 
+df_potencial.toPandas()
+-------------------------------------------------------------
+
+%python
+df_vendas.show()
+ 
+#df_vendas.show(n=3,vertical=True)
+#df_vendas.show(truncate = 1)
+#df_vendas.show(5)
+
+-------------------------------------------------------------
+
+--Contagem de registros no SQL
+select count(1) from tbvendas
+
+-------------------------------------------------------------
+
+%python
+ 
+#Contagem de registros no Python
+ 
+display(df_vendas.count())
+
+-------------------------------------------------------------
+
+--Funcao group by no SQL
+ 
+select categoria, count(1) from tbvendas group by categoria
+
+-------------------------------------------------------------
+
+%python
+ 
+#Funcao group by no Python
+ 
+display(df_vendas.groupby("categoria").count())
+ 
+df_vendas.groupby("categoria").count().show()
+
+-------------------------------------------------------------
+
+Drop table tbvendas_final;
+Drop table tbpotencial_final;
+
+-------------------------------------------------------------
+
+%python
+ 
+dbutils.fs.ls("/user/hive/warehouse")
+
+-------------------------------------------------------------
+
+%python
+#Se houver erro na criação das tabelas devido a reativação do cluster, executar este comando
+dbutils.fs.rm("/user/hive/warehouse/tbvendas_final", recurse=True)
+
+-------------------------------------------------------------
+
+%python
+#Se houver erro na criação das tabelas devido a reativação do cluster, executar este comando
+dbutils.fs.rm("/user/hive/warehouse/tbpotencial_final", recurse=True)
+
+-------------------------------------------------------------
+
+--Criar tabelas finais no delta lake
+--Delta Lake é uma camada de armazenamento que oferece confiabilidade, segurança e desempenho em seu data lake.
+--Se houver erro neste comando depois de realizar o clone do cluster, execute os comandos acima para limpar o DBFS
+ 
+create table tbvendas_final (Client_ID int, Categoria string, Subcategoria string, Produto string, Ano int, Mes int, Cidade string, Valor double, Volume double);
+Create table tbpotencial_final (Client_ID int, Ano int, Area_Comercial double, Area_Hibrida double, Area_Residencial double, Area_Industrial double, ValorPotencial double);
+
+-------------------------------------------------------------
+
+--Verificar Ano
+
+-------------------------------------------------------------
+
+--
+--** inserindo dados na tabela de Vendas no Delta lake
+--
+insert into tbvendas_final (Client_ID, Categoria , SubCategoria , Produto , Ano , Mes , Cidade , Valor , Volume)
+select replace(Client_ID,'Client #','') ,Categoria,SubCategoria,Produto,Year,Month,Cidade,Valor,Volume from tbvendas --where year in ('2020', '2021','2022')
+ 
+--Entender Erro - Olhar mensagem
+
+--------------------------------------------------------------
+
+--
+--** inserindo dados na tabela final Potencial
+--
+ 
+ 
+insert into tbpotencial_final (Client_ID , Ano , Area_Comercial , Area_Hibrida , Area_Residencial , Area_Industrial , ValorPotencial)
+select replace(Client_ID,'Client #',''),    Year, Area_Comercial, Area_Hibrida, Area_Residencial, Area_Industrial, BRL_Potencial from tbpotencial
+
+--------------------------------------------------------------
+
+--
+--##### Consistencia ###### - SQL
+-- Verificando se todos os campos estão preenchidos
+--
+ 
+Select *
+from tbvendas_final 
+where isnull(`Client_ID`) = true
+or isnull(`Categoria`) = true
+or isnull(`Subcategoria`) = true
+or isnull(`Produto`) = true
+or isnull(`Ano`) = true
+or isnull(`Mes`) = true
+or isnull(`Cidade`) = true
+or isnull(`Valor`) = true
+or isnull(`Volume`) = true
+
+--------------------------------------------------------------
+
+-- Apaga registros nulos
+ 
+delete from tbvendas_final 
+where isnull(`Client_ID`) = true
+or isnull(`Categoria`) = true
+or isnull(`Subcategoria`) = true
+or isnull(`Produto`) = true
+or isnull(`Ano`) = true
+or isnull(`Mes`) = true
+or isnull(`Cidade`) = true
+or isnull(`Valor`) = true
+or isnull(`Volume`) = true
+
+--------------------------------------------------------------
+
+--
+--##### Consistencia ###### - SQL
+-- Verificando se todos os campos estão preenchidos
+--
+ 
+Select count(1)
+from tbpotencial_final 
+where isnull(`Client_ID`) = true
+or isnull(`Ano`) = true
+or isnull(`Area_Comercial`) = true
+or isnull(`Area_Hibrida`) = true
+or isnull(`Area_Residencial`) = true
+or isnull(`Area_Industrial`) = true
+or isnull(`ValorPotencial`) = true
+
+-------------------------------------------------------------
+
+--
+--Checagem regra de negocio
+--indica as subcategorias de produto. São 10 ao todo. Cada subcategoria pertence a apenas uma categoria.
+--
+ 
+select distinct subcategoria from tbvendas_final order by 1;
+ 
+--select  subcategoria, count(1) as Qtde from tbvendas_final group by subcategoria
+
+-------------------------------------------------------------
+
+--Eliminar Sub-Categoria 99
+delete from tbvendas_final where subcategoria = 'Sub-Categoria 99'
+
+-------------------------------------------------------------
+
+--
+--Checagem regra de negocio
+--indica as subcategorias de produto. São 10 ao todo. Cada subcategoria pertence a apenas uma categoria.
+--
+select count(distinct Categoria) as Qtde, subcategoria from tbvendas_final group by subcategoria having count(distinct Categoria) > 1
+
+-------------------------------------------------------------
+
+--Verifica a distribuição das categorias com mais de uma subcategoria
+select distinct Categoria, Subcategoria from tbvendas_final where Subcategoria in ('Sub-Categoria 8','Sub-Categoria 7') order by 2
+
+
+-------------------------------------------------------------
+
+--Verifica a distribuição das categorias com mais de uma subcategoria fazendo contagem
+select Categoria, Subcategoria, count(1) from tbvendas_final where Categoria in ('XTZ250','XT660','CB750') group by Categoria, Subcategoria order by 1
+
+-------------------------------------------------------------
+
+--"Cada subcategoria pertence a apenas uma categoria."
+--Poderia desconsiderar os registros XT660 e Subcategoria 8 (apenas 22 reg.)
+--e desconsiderar os registros XTZ250 e Subcategoria 7 (apenas 8 reg.)
+ 
+delete from tbvendas_final where categoria = 'XT660' and subcategoria= 'Sub-Categoria 8';
+delete from tbvendas_final where categoria = 'XTZ250' and subcategoria= 'Sub-Categoria 7';
+
+-------------------------------------------------------------
+
+select * from tbvendas_final
+-------------------------------------------------------------
+
+select * from tbpotencial_final
