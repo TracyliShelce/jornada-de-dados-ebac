@@ -1,72 +1,23 @@
 # jornada-de-dados-ebac
 Jornada de Dados - EBAC
 
+# Protejo de Analise de Dados
 
 
---
---*** CRIAÇÃO TABELA TRANSAÇÃO ***
---
 
-create table tbVendas_Final (
-CodCliente	int , 
-Categoria	varchar(50), 
-SubCategoria varchar(50), 
-Produto		varchar(50), 
-Ano			int, 
-Mes			int, 
-Cidade		varchar(50), 
-Valor		float, 
-Volume		float)
+Objetivo
+Usar ferramentas de manipulação de dados para entender a estrutura e qualidade dos dados que serão apresentados.
 
-select * from tbVendas_Final
+Key questions:
+Prospecção de clientes: quais oportunidades para conquistar novos clientes? Como identificar os clientes com maior potencial de compra?
+Perda de clientes: como controlar a perda de clientes.
+Ranking Top 10: Identificar produtos e categorias mais vendidos.
+Oportunidades: Entender oportunidades de crescimento por região cidade.
 
 
---
---*** CARGA DE DADOS VIA BULK INSERT ***
---
-truncate table tbVendas_Final
-
-BULK INSERT tbVendas_Final
-    FROM 'C:\Users\DELL\Desktop\Imersao Dados\DataSet\vendas.csv'
-    WITH
-    (
-    FIRSTROW = 2,
-    FIELDTERMINATOR = ',',  
-	ROWTERMINATOR = '0x0a'
-   
-    )
+Ferramentas
+Databricks - é uma plataforma de análise de dados unificada para engenharia de dados.  Linguagens utilizadas no databricks (Python, SQL, R e Scala)
+Microsoft SQL – Banco de dados relacional. Linguagem T-SQL.
+Power BI – Ferramenta de BI da Microsoft para visualização de dados. Linguagens DAX e M.
 
 
-	--
---*** CRIAÇÃO TABELA POTENCIAL ***
---
-
-create table tbPotencial_Final (
-CodCliente				int, 
-Ano						int, 
-Area_Comercial			float, 
-Area_Hibrida			float, 
-Area_Residencial		float, 
-Area_Industrial			float, 
-ValorPotencial			float
-)
-
-
---
---*** CARGA DE DADOS VIA BULK INSERT ***
---
-
-truncate table tbPotencial_Final
-
-BULK INSERT tbPotencial_Final
-    FROM 'C:\Users\DELL\Desktop\Imersao Dados\DataSet\potencial.csv'
-    WITH
-    (
-    FIRSTROW = 2,
-    FIELDTERMINATOR = ',',  
-	ROWTERMINATOR = '0x0a'
-   
-    )
-
-CREATE INDEX index_potencial ON tbPotencial_Final (CodCliente);
-CREATE INDEX index1 ON tbVendas_Final (CodCliente);
